@@ -44,7 +44,7 @@ def format_excel(input_file, header_row):
     ).sort_index()
 
     wide = wide.reset_index()
-
+    wide.columns.name = None
     wide.to_csv(output_path)
     
     return wide, output_path
