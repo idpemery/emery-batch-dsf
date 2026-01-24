@@ -44,8 +44,8 @@ def format_excel(input_file, header_row):
     ).sort_index()
 
     wide.to_csv(output_path)
-
-    return output_path
+    
+    return wide, output_path
 
 
 def main():
