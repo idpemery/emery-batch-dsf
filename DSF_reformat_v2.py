@@ -43,6 +43,8 @@ def format_excel(input_file, header_row):
         values="Fluorescence"
     ).sort_index()
 
+    wide = wide.reset_index()
+
     wide.to_csv(output_path)
     
     return wide, output_path
