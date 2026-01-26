@@ -63,14 +63,6 @@ def trim_dsf_for_fitting(temperature, signal, min_points=5, T_cutoff=30):
     return T_trim, F_trim
 
 
-
-## defines sigmoid model (overwritten)
-def DSF_sigmoid(T, Tm, slope, uB, lB):
-    num = uB - lB
-    denom = 1 + np.exp((Tm - T) / slope)
-
-    return lB - (num / denom)
-
 def DSF_sigmoid(T, Tm, slope, uB, lB):
     # Clip slope to avoid divide by zero
     slope = max(abs(slope), 0.01)
