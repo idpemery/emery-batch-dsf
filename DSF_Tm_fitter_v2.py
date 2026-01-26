@@ -14,20 +14,12 @@ from scipy.signal import argrelextrema
 ## finds local minimum (lower baseline) and maximum (upper baseline) to trim dataset for fitting
 
 import numpy as np
-from scipy.signal import argrelextrema
+from scipy.signal import find_peaks
 
-def trim_dsf_for_fitting(temperature, signal, min_points=5, T_cutoff=30):
-    """
-    Trim DSF data for sigmoid fitting (batch-safe).
+def trim_dsf_for_fitting(T, F, min_points=5):
+    T = np.asarray(T, dtype=float)
+    F = np.asarray(F, dtype=float)
 
-    Rules:
-    - Lower baseline: first local minimum
-    - Upper baseline: max signal at T > T_cutoff
-    """
-    T = np.asarray(temperature, dtype=float)
-    F = np.asarray(signal, dtype=float)
-
-    # remove NaNs/Infs
     mask = np.isfinite(T) & np.isfinite(F)
     T = T[mask]
     F = F[mask]
@@ -36,32 +28,23 @@ def trim_dsf_for_fitting(temperature, signal, min_points=5, T_cutoff=30):
         return T, F
 
     # --- first local minimum ---
-    minima_idx = argrelextrema(F, np.less, order=2)[0]
+    minima_idx = argrelextrema(F, np.less, order=5)[0]
     idx_min = int(minima_idx[0]) if len(minima_idx) > 0 else int(np.argmin(F))
 
-    # --- maximum at T > T_cutoff ---
-    mask_upper = T > T_cutoff
-    if np.any(mask_upper):
-        idx_candidates = np.where(mask_upper)[0]
-        idx_max = int(idx_candidates[np.argmax(F[idx_candidates])])
+    # --- first local maximum after the minimum ---
+    maxima_idx = argrelextrema(F, np.greater, order=5)[0]
+    maxima_after_min = maxima_idx[maxima_idx > idx_min]
+    if len(maxima_after_min) > 0:
+        idx_max = int(maxima_after_min[0])
     else:
-        idx_max = int(np.argmax(F))
+        # fallback: global max
+        idx_max = int(np.argmax(F[idx_min:] + idx_min))
 
-    # --- ensure idx_max > idx_min ---
-    if idx_max <= idx_min:
-        # fallback: return full curve
+    # --- ensure enough points ---
+    if idx_max <= idx_min or (idx_max - idx_min + 1) < min_points:
         return T, F
 
-    # --- trim ---
-    T_trim = T[idx_min:idx_max + 1]
-    F_trim = F[idx_min:idx_max + 1]
-
-    # fallback if trimming leaves too few points
-    if len(T_trim) < min_points:
-        return T, F
-
-    return T_trim, F_trim
-
+    return T[idx_min:idx_max + 1], F[idx_min:idx_max + 1]
 
 def DSF_sigmoid(T, Tm, slope, uB, lB):
     # Clip slope to avoid divide by zero
