@@ -27,9 +27,7 @@ def format_excel(input_file, header_row):
     os.makedirs(out_folder, exist_ok=True)
 
     base_name = os.path.splitext(os.path.basename(input_file))[0]
-    output_path = os.path.join(
-        out_folder, f"{base_name}_formatted.csv"
-    )
+    output_path = f"{base_name}_formatted.csv"
 
     df = pd.read_excel(
         input_file,
@@ -46,6 +44,8 @@ def format_excel(input_file, header_row):
     wide = wide.reset_index()
     wide.columns.name = None
     wide.to_csv(output_path)
+
+    files.download(output_path)
     
     return wide, output_path
 
