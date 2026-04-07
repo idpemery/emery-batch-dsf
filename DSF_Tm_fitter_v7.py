@@ -25,22 +25,15 @@ import numpy as np
 import numpy as np
 from scipy.signal import argrelextrema
 
-def trim_dsf_for_fitting(T, F, min_points=5):
+import numpy as np
+from scipy.signal import argrelextrema
+
+def trim_dsf_first_local_min(T, F, min_points=5, min_peak_height=0.05):
     """
-    Trim DSF data to first min → first max within 30–70 °C, ensuring enough points.
+    Trim DSF data from first local minimum → first maximum after it,
+    strictly within 30–70 °C.
     
-    Parameters:
-        T : array-like
-            Temperature values (°C).
-        F : array-like
-            Fluorescence values.
-        min_points : int
-            Minimum number of points required for a valid slice.
-    
-    Returns:
-        T_trim, F_trim : np.ndarray
-            Trimmed temperature and fluorescence arrays.
-            If criteria are not met, returns empty arrays.
+    Does NOT fall back to the global minimum; if no local min exists, returns empty arrays.
     """
     T = np.asarray(T, dtype=float)
     F = np.asarray(F, dtype=float)
@@ -53,38 +46,45 @@ def trim_dsf_for_fitting(T, F, min_points=5):
     if len(F) == 0:
         return np.array([]), np.array([])
     
-    # --- restrict to 30–70 °C window ---
+    # Restrict to 30–70°C window
     mask_window = (T >= 30) & (T <= 70)
     if not np.any(mask_window):
         return np.array([]), np.array([])
     
-    T_window = T[mask_window]
-    F_window = F[mask_window]
-    indices_window = np.where(mask_window)[0]
+    T_win = T[mask_window]
+    F_win = F[mask_window]
+    indices_win = np.where(mask_window)[0]
     
-    # --- find first local minimum in window ---
-    minima_idx = argrelextrema(F_window, np.less, order=2)[0]
-    if len(minima_idx) > 0:
-        idx_min = minima_idx[0]
-    else:
-        idx_min = np.argmin(F_window)
+    # Find all local minima in the window
+    minima_idx = argrelextrema(F_win, np.less, order=2)[0]
     
-    # --- find first local maximum AFTER minimum ---
-    maxima_idx = argrelextrema(F_window, np.greater, order=1)[0]
+    if len(minima_idx) == 0:
+        # STRICT: no local minimum → fail
+        return np.array([]), np.array([])
+    
+    # Pick the first local minimum
+    idx_min = minima_idx[0]
+    
+    # Find local maxima after the minimum
+    maxima_idx = argrelextrema(F_win, np.greater, order=1)[0]
     maxima_after_min = maxima_idx[maxima_idx > idx_min]
+    
+    # Apply minimum peak height threshold
+    peak_threshold = F_win[idx_min] + min_peak_height * (F_win.max() - F_win.min())
+    maxima_after_min = maxima_after_min[F_win[maxima_after_min] > peak_threshold]
     
     if len(maxima_after_min) == 0:
         return np.array([]), np.array([])
-    
+
     idx_max = maxima_after_min[0]
     
-    # --- ensure enough points ---
+    # Ensure enough points
     if (idx_max - idx_min + 1) < min_points:
         return np.array([]), np.array([])
     
     # Map back to original indices
-    idx_min_orig = indices_window[idx_min]
-    idx_max_orig = indices_window[idx_max]
+    idx_min_orig = indices_win[idx_min]
+    idx_max_orig = indices_win[idx_max]
     
     return T[idx_min_orig:idx_max_orig+1], F[idx_min_orig:idx_max_orig+1]
     
