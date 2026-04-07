@@ -22,47 +22,71 @@ import numpy as np
 from scipy.signal import argrelextrema
 import numpy as np
 
+import numpy as np
+from scipy.signal import argrelextrema
+
 def trim_dsf_for_fitting(T, F, min_points=5):
+    """
+    Trim DSF data to first min → first max within 30–70 °C, ensuring enough points.
+    
+    Parameters:
+        T : array-like
+            Temperature values (°C).
+        F : array-like
+            Fluorescence values.
+        min_points : int
+            Minimum number of points required for a valid slice.
+    
+    Returns:
+        T_trim, F_trim : np.ndarray
+            Trimmed temperature and fluorescence arrays.
+            If criteria are not met, returns empty arrays.
+    """
     T = np.asarray(T, dtype=float)
     F = np.asarray(F, dtype=float)
-
+    
+    # Remove NaNs/Infs
     mask = np.isfinite(T) & np.isfinite(F)
     T = T[mask]
     F = F[mask]
-
+    
     if len(F) == 0:
-        return T, F
-
-    # --- first local minimum (full range) ---
-    minima_idx = argrelextrema(F, np.less, order=2)[0]
-    idx_min = int(minima_idx[0]) if len(minima_idx) > 0 else int(np.argmin(F))
-
-    # --- define REQUIRED 30–70 °C window ---
-    mask_30_70 = (T >= 30) & (T <= 70)
-    valid_indices = np.where(mask_30_70)[0]
-
-    if len(valid_indices) == 0:
-        return T, F  # no valid temperature window → fail
-
-    # --- find local maxima ---
-    maxima_idx = argrelextrema(F, np.greater, order=1)[0]
-
-    # --- keep only maxima in 30–70 ---
-    maxima_in_range = maxima_idx[np.isin(maxima_idx, valid_indices)]
-
-    # --- require a max AFTER the minimum ---
-    maxima_after_min = maxima_in_range[maxima_in_range > idx_min]
-
+        return np.array([]), np.array([])
+    
+    # --- restrict to 30–70 °C window ---
+    mask_window = (T >= 30) & (T <= 70)
+    if not np.any(mask_window):
+        return np.array([]), np.array([])
+    
+    T_window = T[mask_window]
+    F_window = F[mask_window]
+    indices_window = np.where(mask_window)[0]
+    
+    # --- find first local minimum in window ---
+    minima_idx = argrelextrema(F_window, np.less, order=2)[0]
+    if len(minima_idx) > 0:
+        idx_min = minima_idx[0]
+    else:
+        idx_min = np.argmin(F_window)
+    
+    # --- find first local maximum AFTER minimum ---
+    maxima_idx = argrelextrema(F_window, np.greater, order=1)[0]
+    maxima_after_min = maxima_idx[maxima_idx > idx_min]
+    
     if len(maxima_after_min) == 0:
-        return T, F  # STRICT: no valid max → fail (no trimming)
-
-    idx_max = int(maxima_after_min[0])
-
+        return np.array([]), np.array([])
+    
+    idx_max = maxima_after_min[0]
+    
     # --- ensure enough points ---
-    if idx_max <= idx_min or (idx_max - idx_min + 1) < min_points:
-        return T, F
-
-    return T[idx_min:idx_max + 1], F[idx_min:idx_max + 1]
+    if (idx_max - idx_min + 1) < min_points:
+        return np.array([]), np.array([])
+    
+    # Map back to original indices
+    idx_min_orig = indices_window[idx_min]
+    idx_max_orig = indices_window[idx_max]
+    
+    return T[idx_min_orig:idx_max_orig+1], F[idx_min_orig:idx_max_orig+1]
     
 def DSF_sigmoid(T, Tm, slope, uB, lB):
     # Clip slope to avoid divide by zero
