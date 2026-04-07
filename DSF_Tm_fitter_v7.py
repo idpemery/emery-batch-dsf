@@ -19,6 +19,9 @@ from scipy.signal import find_peaks
 from scipy.signal import argrelextrema
 import numpy as np
 
+from scipy.signal import argrelextrema
+import numpy as np
+
 def trim_dsf_for_fitting(T, F, min_points=5):
     T = np.asarray(T, dtype=float)
     F = np.asarray(F, dtype=float)
@@ -34,9 +37,12 @@ def trim_dsf_for_fitting(T, F, min_points=5):
     minima_idx = argrelextrema(F, np.less, order=2)[0]
     idx_min = int(minima_idx[0]) if len(minima_idx) > 0 else int(np.argmin(F))
 
-    # --- restrict to 30–70 °C for max ---
+    # --- define REQUIRED 30–70 °C window ---
     mask_30_70 = (T >= 30) & (T <= 70)
     valid_indices = np.where(mask_30_70)[0]
+
+    if len(valid_indices) == 0:
+        return T, F  # no valid temperature window → fail
 
     # --- find local maxima ---
     maxima_idx = argrelextrema(F, np.greater, order=1)[0]
@@ -44,23 +50,20 @@ def trim_dsf_for_fitting(T, F, min_points=5):
     # --- keep only maxima in 30–70 ---
     maxima_in_range = maxima_idx[np.isin(maxima_idx, valid_indices)]
 
-    # --- first max after min ---
+    # --- require a max AFTER the minimum ---
     maxima_after_min = maxima_in_range[maxima_in_range > idx_min]
 
-    if len(maxima_after_min) > 0:
-        idx_max = int(maxima_after_min[0])
-    else:
-        # fallback: global max within 30–70
-        if len(valid_indices) > 0:
-            idx_max = int(valid_indices[np.argmax(F[valid_indices])])
-        else:
-            idx_max = int(np.argmax(F))  # last resort
+    if len(maxima_after_min) == 0:
+        return T, F  # STRICT: no valid max → fail (no trimming)
+
+    idx_max = int(maxima_after_min[0])
 
     # --- ensure enough points ---
     if idx_max <= idx_min or (idx_max - idx_min + 1) < min_points:
         return T, F
 
     return T[idx_min:idx_max + 1], F[idx_min:idx_max + 1]
+    
 def DSF_sigmoid(T, Tm, slope, uB, lB):
     # Clip slope to avoid divide by zero
     slope = max(abs(slope), 0.01)
