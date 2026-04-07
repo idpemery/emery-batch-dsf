@@ -41,7 +41,8 @@ def trim_dsf_for_fitting(T, F, min_points=5):
         # fixed fallback
         idx_max = idx_min + int(np.argmax(F[idx_min:]))
     
-    if idx_min >= idx_max:
+    span = idx_max - idx_min + 1
+    if idx_min >= idx_max or span < min_points or span > 0.8 * len(F):
         idx_peak = int(np.argmax(F))
         window=15
         idx_min = max(0, idx_peak - window)
