@@ -27,19 +27,15 @@ def trim_dsf_for_fitting(T, F, min_points=5):
     if len(F) == 0:
         return T, F
 
-    # --- first local minimum ---
     minima_idx = argrelextrema(F, np.less, order=5)[0]
     idx_min = int(minima_idx[0]) if len(minima_idx) > 0 else int(np.argmin(F))
 
-    # --- first local maximum after the minimum ---
     maxima_idx = argrelextrema(F, np.greater, order=5)[0]
     maxima_after_min = maxima_idx[maxima_idx > idx_min]
-    if len(maxima_after_min) > 0:
-        idx_max = int(maxima_after_min[0])
-    else:
-        # fallback: global max
-        idx_max = int(np.argmax(F[idx_min:] + idx_min))
-
+        if len(maxima_after_min) > 0:
+            idx_max = int(maxima_after_min[0])
+        else:
+            idx_max = idx_min + int(np.argmax(F[idx_min:]))  # <-- fixed
     # --- ensure enough points ---
     if idx_max <= idx_min or (idx_max - idx_min + 1) < min_points:
         return T, F
