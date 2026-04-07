@@ -29,16 +29,14 @@ def trim_dsf_derivative(T, F, window=10, smooth=True):
         return T, F
 
     # --- optional smoothing (helps a lot) ---
-    if smooth:
-        F_smooth = np.convolve(F, np.ones(5)/5, mode='same')
-    else:
-        F_smooth = F
+    F_smooth = np.convolve(F, np.ones(5)/5, mode='same')
 
     # --- compute derivative ---
     dF_dT = np.gradient(F_smooth, T)
 
+    edge=5
     # --- find transition center ---
-    idx_peak = int(np.argmax(dF_dT))   # for normal DSF (increasing signal)
+    idx_peak = int(np.argmax(np.abs(dF_dT[edge:-edge]))) + edge  # for normal DSF (increasing signal)
 
     # If curves can be reversed, use this instead:
     # idx_peak = int(np.argmax(np.abs(dF_dT)))
